@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import os
+import re
 import sys
 
 import numpy as np
@@ -96,16 +97,17 @@ class ServerProcessor:
         }
 
 
-        if resp_type == "RESULT" and (text is not None):
+        if (resp_type == "RESULT") and (text is not None):
             segments = []
             if isinstance(text, str):
                 text = [text]
             if isinstance(text, list):
                 for text_i in text:
-                    start_time, end_time, content = text_i.split(" ")
+                    start_time, end_time, content = re.findall(r"(\d+\.\d+) (\d+\.\d+) (.*)", text_i)[0]
+
                     seg = {
-                            "start_time": start_time,
-                            "end_time": end_time,
+                            "start_time": '{:.2f}'.format(float(start_time)),
+                            "end_time": '{:.2f}'.format(float(end_time)),
                             "is_final": is_final,
                             "result": {
                                 "text": content,
@@ -184,7 +186,13 @@ async def asr_server(websocket, path):
 
 
 # Start the WebSocket server
-start_server = websockets.serve(asr_server, args.host, args.port)
+async def main():
+    start_server = websockets.serve(asr_server, args.host, args.port)
 
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
+    server = await start_server
+    logger.info(f'Server started at ws://{args.host}:{args.port}')
+
+    async with server:
+        await server.wait_closed()
+
+asyncio.run(main())

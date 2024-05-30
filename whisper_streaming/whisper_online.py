@@ -2,9 +2,11 @@
 import io
 import logging
 import math
+import os
 import sys
 import time
 
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from functools import lru_cache
 
 import librosa
