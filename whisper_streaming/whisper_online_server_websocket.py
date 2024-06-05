@@ -103,7 +103,7 @@ class ServerProcessor:
                 text = [text]
             if isinstance(text, list):
                 for text_i in text:
-                    start_time, end_time, content = re.findall(r"(\d+\.\d+) (\d+\.\d+) (.*)", text_i)[0]
+                    start_time, end_time, content = re.findall(r"(\d+\.?\d*) (\d+\.?\d*) (.*)", text_i)[0]
 
                     seg = {
                             "start_time": '{:.2f}'.format(float(start_time)),
@@ -125,7 +125,13 @@ class ServerProcessor:
         msg = self.format_output_transcript(o)
         if msg is not None:
             response = self.format_message(result_type, text=msg)
-            await websocket.send(json.dumps(response))
+            await self.ws_send(websocket, json.dumps(response))
+
+    async def ws_send(self, websocket, msg):
+        try:
+            await websocket.send(msg)
+        except websockets.ConnectionClosed:
+            logger.info("Connection closed, waiting for a new connection.")
 
 
 
@@ -146,7 +152,7 @@ async def asr_server(websocket, path):
 
                 # Send back status update
                 start_message = proc.format_message('START')
-                await websocket.send(json.dumps(start_message))
+                await proc.ws_send(websocket, json.dumps(start_message))
 
             elif control_message["command"] == "END":
                 # This is the end recognition message
@@ -154,7 +160,7 @@ async def asr_server(websocket, path):
                 await proc.send_result(websocket, o, result_type="RESULT")
 
                 end_message = proc.format_message('END', is_final=True)
-                await websocket.send(json.dumps(end_message))
+                await proc.ws_send(websocket, json.dumps(end_message))
         elif isinstance(message, bytes):
             # If the message is binary data, it may be audio data
             sf = soundfile.SoundFile(
@@ -182,7 +188,7 @@ async def asr_server(websocket, path):
         else:
             # If the message is neither a string nor a binary data, it is an error
             error_message = proc.format_message('ERROR')
-            await websocket.send(json.dumps(error_message))
+            await proc.ws_send(websocket, json.dumps(error_message))
 
 
 # Start the WebSocket server
